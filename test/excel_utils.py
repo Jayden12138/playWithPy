@@ -1,6 +1,5 @@
 from openpyxl import load_workbook
 
-
 def fill_excel_with_data(excel_path, extracted_data, total_amount):
     # 打开Excel文件
     workbook = load_workbook(excel_path)
@@ -20,6 +19,7 @@ def fill_excel_with_data(excel_path, extracted_data, total_amount):
     # 查找里程、打车日期、起点+终点、每笔实际打车费对应的列
     distance_col = None
     date_col = None
+    time_col = None
     service_content_col = None
     actual_fare_col = None
     for col in range(1, sheet.max_column + 1):
@@ -35,7 +35,7 @@ def fill_excel_with_data(excel_path, extracted_data, total_amount):
         elif header == '每笔实际打车费':
             actual_fare_col = col
 
-    if not all([distance_col, date_col, service_content_col, actual_fare_col]):
+    if not all([distance_col, date_col, time_col, service_content_col, actual_fare_col]):
         print("所需列未找到")
         return
 
@@ -47,8 +47,8 @@ def fill_excel_with_data(excel_path, extracted_data, total_amount):
             break
 
     if target_row is None:
-        print("未找到匹配的金额行")
-        return
+        # 若未找到匹配的金额行，则在最后一行的下一行写入数据
+        target_row = sheet.max_row + 5
 
     # 确定插入数据的起始行和插入行数
     start_row = target_row + 1
@@ -72,4 +72,3 @@ def fill_excel_with_data(excel_path, extracted_data, total_amount):
 
     # 保存修改后的Excel文件
     workbook.save(excel_path)
-
