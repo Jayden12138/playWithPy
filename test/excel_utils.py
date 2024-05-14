@@ -1,4 +1,4 @@
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
 
 def fill_excel_with_data(excel_path, extracted_data, total_amount):
     # 打开Excel文件
@@ -47,28 +47,50 @@ def fill_excel_with_data(excel_path, extracted_data, total_amount):
             break
 
     if target_row is None:
-        # 若未找到匹配的金额行，则在最后一行的下一行写入数据
-        target_row = sheet.max_row + 5
+        # 若未找到匹配的金额行，则写入新的工作表
+        if '未匹配数据' not in workbook.sheetnames:
+            new_sheet = workbook.create_sheet('未匹配数据')
+            # 添加表头
+            new_sheet.append(['服务内容', '打车日期', '打车时间', '每笔实际打车费', '行程距离'])
+        else:
+            new_sheet = workbook['未匹配数据']
 
-    # 确定插入数据的起始行和插入行数
-    start_row = target_row + 1
-    num_rows = len(extracted_data)
+        # 获取新工作表的当前最大行数
+        start_row = new_sheet.max_row + 1
+        if start_row > 1:
+            # 在每个数据块之间插入4行空行
+            start_row += 4
 
-    # 在target_row处插入num_rows行的空行
-    sheet.insert_rows(start_row, num_rows - 1)
+        # 填入PDF表格数据
+        for i, row in enumerate(extracted_data.iterrows(), start=start_row - 1):
+            date_time_str = row[1]['上车时间']
+            date_part = date_time_str.split()[0]
+            time_part = date_time_str.split()[1]
 
-    # 填入PDF表格数据
-    for i, row in enumerate(extracted_data.iterrows(), start=start_row - 1):
-        # 分割日期和时间
-        date_time_str = row[1]['上车时间']
-        date_part = date_time_str.split()[0]
-        time_part = date_time_str.split()[1]
+            new_sheet.cell(row=i, column=1).value = f"{row[1]['起点']} - {row[1]['终点']}"
+            new_sheet.cell(row=i, column=2).value = date_part
+            new_sheet.cell(row=i, column=3).value = time_part
+            new_sheet.cell(row=i, column=4).value = row[1]['金额[元]']
+            new_sheet.cell(row=i, column=5).value = row[1]['里程[公里]']
+    else:
+        # 确定插入数据的起始行和插入行数
+        start_row = target_row + 1
+        num_rows = len(extracted_data)
 
-        sheet.cell(row=i, column=distance_col).value = row[1]['里程[公里]']
-        sheet.cell(row=i, column=date_col).value = date_part
-        sheet.cell(row=i, column=time_col).value = time_part
-        sheet.cell(row=i, column=service_content_col).value = f"{row[1]['起点']} - {row[1]['终点']}"
-        sheet.cell(row=i, column=actual_fare_col).value = row[1]['金额[元]']
+        # 在target_row处插入num_rows行的空行
+        sheet.insert_rows(start_row, num_rows)
+
+        # 填入PDF表格数据
+        for i, row in enumerate(extracted_data.iterrows(), start=start_row):
+            date_time_str = row[1]['上车时间']
+            date_part = date_time_str.split()[0]
+            time_part = date_time_str.split()[1]
+
+            sheet.cell(row=i, column=distance_col).value = row[1]['里程[公里]']
+            sheet.cell(row=i, column=date_col).value = date_part
+            sheet.cell(row=i, column=time_col).value = time_part
+            sheet.cell(row=i, column=service_content_col).value = f"{row[1]['起点']} - {row[1]['终点']}"
+            sheet.cell(row=i, column=actual_fare_col).value = row[1]['金额[元]']
 
     # 保存修改后的Excel文件
     workbook.save(excel_path)
