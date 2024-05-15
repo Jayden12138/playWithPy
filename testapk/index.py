@@ -1,14 +1,33 @@
 import os
 import shutil
-
 import pandas as pd
 import requests
 import subprocess
+import tkinter as tk
+from tkinter import simpledialog
 
 # 设置Excel文件路径和APK下载目录
 excel_file_path = 'source/1.xlsx'
 apk_download_dir = 'path_to_apk_download_directory'
-adb_path = 'D:\\work\\platform-tools\\adb.exe'  # 确认ADB工具的路径
+
+# 尝试从环境变量中获取ADB路径
+adb_path = os.getenv('ADB_PATH', 'D:\\work\\platform-tools\\adb.exe')  # 默认路径
+
+
+def prompt_adb_path():
+    root = tk.Tk()
+    root.withdraw()  # 隐藏主窗口
+    adb_path = simpledialog.askstring("ADB路径", "请输入ADB工具的路径:")
+    if adb_path:
+        os.environ['ADB_PATH'] = adb_path
+        return adb_path
+    else:
+        print("未指定ADB路径，退出程序")
+        exit(0)
+
+# 检查ADB路径是否有效
+if not os.path.exists(adb_path) or not os.path.isfile(adb_path):
+    adb_path = prompt_adb_path()
 
 # 检查下载目录是否存在，如果不存在则创建
 if not os.path.exists(apk_download_dir):
@@ -36,9 +55,8 @@ df['安装正常'] = df.get('安装正常', '').astype(str)
 df['APP联网'] = df.get('APP联网', '').astype(str)
 df['不需要登录'] = df.get('不需要登录', '').astype(str)
 
-
 # 获取设备列表
-def get_device_serial():
+def get_device_serial(adb_path):
     try:
         result = subprocess.run([adb_path, 'devices'], capture_output=True, text=True)
         lines = result.stdout.splitlines()
@@ -52,8 +70,7 @@ def get_device_serial():
         print(f"获取设备列表异常: {e}")
         exit(1)
 
-device_serial = get_device_serial()
-
+device_serial = get_device_serial(adb_path)
 
 # 下载APK文件
 def download_apk(url, download_dir):
@@ -74,9 +91,8 @@ def download_apk(url, download_dir):
         print(f"下载失败: {e}")
         return None
 
-
 # 安装APK文件
-def install_apk(apk_path):
+def install_apk(adb_path, apk_path):
     try:
         print(f"开始安装: {apk_path}")
         result = subprocess.run([adb_path, '-s', device_serial, 'install', apk_path], capture_output=True, text=True)
@@ -90,9 +106,8 @@ def install_apk(apk_path):
         print(f"安装异常: {e}")
         return False
 
-
 # 检查APP联网状态
-def check_app_network(app_package_name):
+def check_app_network(adb_path, app_package_name):
     try:
         print("检查APP联网状态")
         result = subprocess.run([adb_path, '-s', device_serial, 'shell', 'dumpsys', 'package', app_package_name],
@@ -106,7 +121,6 @@ def check_app_network(app_package_name):
     except subprocess.SubprocessError as e:
         print(f"联网检查异常: {e}")
         return False
-
 
 # 遍历每个APK链接并处理
 for index, row in df.iterrows():
@@ -125,7 +139,7 @@ for index, row in df.iterrows():
             continue
 
         # 安装APK
-        install_success = install_apk(apk_path)
+        install_success = install_apk(adb_path, apk_path)
         df.at[index, '安装正常'] = '是' if install_success else '否'
 
         if install_success:
@@ -133,7 +147,7 @@ for index, row in df.iterrows():
             app_package_name = row['包名']
 
             # 检查APP联网状态
-            network_success = check_app_network(app_package_name)
+            network_success = check_app_network(adb_path, app_package_name)
             df.at[index, 'APP联网'] = '是' if network_success else '否'
 
             # 检查“不需要登录”状态（这里假设无法自动判断）

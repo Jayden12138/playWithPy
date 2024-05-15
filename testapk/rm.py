@@ -1,6 +1,6 @@
 import subprocess
 
-adb_path = 'D:\\work\\platform-tools\\adb.exe'  # 确认ADB工具的路径
+adb_path = 'D:\\platform-tools\\adb.exe'  # 确认ADB工具的路径
 
 # 获取设备列表
 def get_device_serial():
