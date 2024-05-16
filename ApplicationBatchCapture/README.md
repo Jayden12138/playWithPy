@@ -20,3 +20,18 @@
   - [ ] 显示下载进度
   - [ ] 显示任务完成进度
   - [ ] 任务完成后 总结
+
+
+## build
+
+```shell
+
+# 
+cd ApplicationBatchCapture
+
+# build
+pyinstaller .\code\main.py
+
+```
+
+
