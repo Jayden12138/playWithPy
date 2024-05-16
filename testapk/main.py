@@ -5,9 +5,11 @@ import requests
 import subprocess
 import tkinter as tk
 from tkinter import scrolledtext, filedialog, messagebox
-
+import threading
+from tkinter import ttk
 
 class App:
+    # 在 __init__ 方法中添加一个进度条
     def __init__(self, root):
         self.root = root
         self.root.title("APK Installer and Uninstaller")
@@ -53,9 +55,43 @@ class App:
         self.log_text = scrolledtext.ScrolledText(frame, width=80, height=20)
         self.log_text.grid(row=4, column=0, columnspan=3, pady=10)
 
+        # 进度条
+        self.progress = ttk.Progressbar(frame, orient='horizontal', mode='determinate', length=500)
+        self.progress.grid(row=5, column=0, columnspan=3, pady=10)
+
         # 清空按钮
         clear_button = tk.Button(frame, text="清空", command=self.clear_log)
-        clear_button.grid(row=5, column=0, columnspan=3, pady=10)
+        clear_button.grid(row=6, column=0, columnspan=3, pady=10)
+
+    def download_apk(self, url):
+        local_filename = os.path.join(self.apk_download_dir, url.split('/')[-1].split('?')[0])
+        try:
+            self.log(f"开始下载: {url}")
+
+            def download():
+                with requests.get(url, stream=True) as r:
+                    r.raise_for_status()
+                    total_size = int(r.headers.get('content-length', 0))
+                    chunk_size = 8192
+                    num_bars = total_size // chunk_size
+                    with open(local_filename, 'wb') as f:
+                        for i, chunk in enumerate(r.iter_content(chunk_size=chunk_size)):
+                            f.write(chunk)
+                            self.progress['value'] = (i / num_bars) * 100
+                            self.root.update_idletasks()
+
+                self.log(f"下载完成: {local_filename}")
+                self.progress['value'] = 0  # Reset progress bar after download
+                return local_filename
+
+            download_thread = threading.Thread(target=download)
+            download_thread.start()
+            download_thread.join()
+
+            return local_filename
+        except requests.exceptions.RequestException as e:
+            self.log(f"下载失败: {e}")
+            return None
 
     def browse_adb(self):
         path = filedialog.askopenfilename(title="选择ADB工具路径")
