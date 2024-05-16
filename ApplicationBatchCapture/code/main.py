@@ -70,7 +70,9 @@ class App:
     def clear_log(self):
         self.log_text.delete(1.0, tk.END)
 
-    def log(self, message):
+    def log(self, message, refresh=False):
+        if refresh:
+            self.log_text.delete("end-2l", "end-1l")
         self.log_text.insert(tk.END, message + '\n')
         self.log_text.see(tk.END)
         self.root.update()
@@ -117,10 +119,18 @@ class App:
         if not self.device_serial:
             return
 
+        # 提示总任务数
+        total_tasks = len(df)
+        self.log(f"总任务数: {total_tasks}")
+
+        successful_installs = 0
+
         # 遍历每个APK链接并处理
         for index, row in df.iterrows():
+            current_task = index + 1
             url = row['下载地址']
             try:
+                self.log(f"开始执行任务 ({current_task}/{total_tasks})")
                 apk_path = self.download_apk(url)
                 if apk_path:
                     df.at[index, 'apk下载正常'] = '是'
@@ -135,6 +145,7 @@ class App:
                 df.at[index, '安装正常'] = '是' if install_success else '否'
 
                 if install_success:
+                    successful_installs += 1
                     app_package_name = row['包名']
                     network_success = self.check_app_network(adb_path, app_package_name)
                     df.at[index, 'APP联网'] = '是' if network_success else '否'
@@ -158,6 +169,7 @@ class App:
 
         self.clear_directory(self.apk_download_dir)
         self.log("任务完成")
+        self.log(f"此次任务一共处理了 {total_tasks} 条数据，成功安装 {successful_installs} 个应用")
 
     def download_apk(self, url):
         if not url.startswith('http'):
@@ -168,9 +180,16 @@ class App:
             self.log(f"开始下载: {url}")
             with requests.get(url, stream=True) as r:
                 r.raise_for_status()
+                total_length = int(r.headers.get('content-length', 0))
                 with open(local_filename, 'wb') as f:
+                    downloaded = 0
                     for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            done = int(50 * downloaded / total_length)
+                            progress = int(100 * downloaded / total_length)
+                            self.log(f"下载进度: [{'#' * done}{'.' * (50 - done)}] {progress}%", refresh=True)
             self.log(f"下载完成: {local_filename}")
             return local_filename
         except requests.exceptions.RequestException as e:
@@ -226,6 +245,8 @@ class App:
 
             for package_name in package_names:
                 package_name = package_name.replace('package:', '').strip()
+                if package_name.startswith('com.android.') or package_name.startswith('android'):
+                    continue
                 uninstall_result = subprocess.run([adb_path, '-s', self.device_serial, 'uninstall', package_name],
                                                   capture_output=True, text=True)
                 if uninstall_result.returncode == 0:
